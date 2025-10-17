@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat WS Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body>
+<h2>WebSocket Test</h2>
+<label>Chat ID: </label>
+<input id="chatId" value="1" />
+<br><br>
+
+<label>Message: </label>
+<input id="text" oninput="sendTyping(true)" onblur="sendTyping(false)" />
+<button onclick="sendMessage()">Send</button>
+
+<h3>Logs</h3>
+<pre id="log"></pre>
+
+<script>
+    let stompClient = null;
+
+    function log(msg) {
+        const logEl = document.getElementById("log");
+        logEl.textContent += msg + "\n";
+    }
+
+    function connect() {
+        const socket = new SockJS("http://localhost:8080/ws");
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, (frame) => {
+            log("✅ Connected: " + frame);
+            const chatId = document.getElementById("chatId").value;
+
+            // subscribe tin nhắn
+            stompClient.subscribe(`/topic/chats/${chatId}`, (message) => {
+                log("💬 Message: " + message.body);
+            });
+
+            // subscribe typing
+            stompClient.subscribe(`/topic/chats/${chatId}/typing`, (event) => {
+                const data = JSON.parse(event.body);
+                log(`⌨️ Typing event: user ${data.userId} is ${data.typing ? "typing..." : "stopped"}`);
+            });
+        });
+    }
+
+    function sendMessage() {
+        const chatId = document.getElementById("chatId").value;
+        const text = document.getElementById("text").value;
+
+        stompClient.send("/app/messages.send", {}, JSON.stringify({
+            chatId: chatId,
+            text: text
+        }));
+        document.getElementById("text").value = "";
+        sendTyping(false);
+    }
+
+    function sendTyping(isTyping) {
+        const chatId = document.getElementById("chatId").value;
+        if (stompClient && stompClient.connected) {
+            stompClient.send("/app/typing", {}, JSON.stringify({
+                chatId: chatId,
+                typing: isTyping
+            }));
+        }
+    }
+
+    connect();
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<configuration>
+  <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="jace" />
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+      <providers>
+        <timestamp />
+        <version />
+        <loggerName />
+        <threadName />
+        <logLevel />
+        <message />
+        <stackTrace />
+        <mdc />
+        <context />
+        <arguments />
+        <provider class="net.logstash.logback.composite.GlobalCustomFieldsJsonProvider">
+          <customFields>{"app":"${APP_NAME}"}</customFields>
+        </provider>
+      </providers>
+    </encoder>
+  </appender>
+
+  <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+    <remoteHost>${LOGSTASH_HOST:-localhost}</remoteHost>
+    <port>${LOGSTASH_PORT:-5044}</port>
+    <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
+    <keepAliveDuration>5 minutes</keepAliveDuration>
+    <reconnectionDelay>5 seconds</reconnectionDelay>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="LOGSTASH"/>
+  </root>
+</configuration>

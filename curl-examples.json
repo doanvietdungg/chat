@@ -1,0 +1,159 @@
+{
+  "baseUrl": "http://localhost:8080",
+  "notes": [
+    "Replace <TOKEN>, <ID>, <CHAT_ID>, <USER_ID>, <MESSAGE_ID>, <FILE_ID>, <STORED_NAME> as appropriate.",
+    "All requests requiring auth include: -H \"Authorization: Bearer <TOKEN>\"",
+    "Pagination params shown are examples; adjust page, size, sort as needed."
+  ],
+  "curl": [
+    {
+      "name": "Auth - Register",
+      "method": "POST",
+      "url": "/auth/register",
+      "curl": "curl -X POST \"http://localhost:8080/auth/register\" -H \"Content-Type: application/json\" -d '{\"username\":\"alice\",\"email\":\"alice@example.com\",\"password\":\"secret\"}'"
+    },
+    {
+      "name": "Auth - Login",
+      "method": "POST",
+      "url": "/auth/login",
+      "curl": "curl -X POST \"http://localhost:8080/auth/login\" -H \"Content-Type: application/json\" -d '{\"usernameOrEmail\":\"alice\",\"password\":\"secret\"}'"
+    },
+    {
+      "name": "Auth - Refresh",
+      "method": "POST",
+      "url": "/auth/refresh",
+      "curl": "curl -X POST \"http://localhost:8080/auth/refresh\" -H \"Content-Type: application/json\" -d '{\"refreshToken\":\"<REFRESH_TOKEN>\"}'"
+    },
+
+    {
+      "name": "Chats - List",
+      "method": "GET",
+      "url": "/chats",
+      "curl": "curl -X GET \"http://localhost:8080/chats?page=0&size=20&sort=createdAt,desc\" -H \"Authorization: Bearer <TOKEN>\""
+    },
+    {
+      "name": "Chats - Create",
+      "method": "POST",
+      "url": "/chats",
+      "curl": "curl -X POST \"http://localhost:8080/chats\" -H \"Authorization: Bearer <TOKEN>\" -H \"Content-Type: application/json\" -d '{\"type\":\"GROUP\",\"title\":\"My Group\",\"description\":\"About this group\"}'"
+    },
+    {
+      "name": "Chats - Get by ID",
+      "method": "GET",
+      "url": "/chats/{id}",
+      "curl": "curl -X GET \"http://localhost:8080/chats/<ID>\" -H \"Authorization: Bearer <TOKEN>\""
+    },
+    {
+      "name": "Chats - Update",
+      "method": "PUT",
+      "url": "/chats/{id}",
+      "curl": "curl -X PUT \"http://localhost:8080/chats/<ID>\" -H \"Authorization: Bearer <TOKEN>\" -H \"Content-Type: application/json\" -d '{\"title\":\"New Title\",\"description\":\"New Desc\",\"settings\":\"{\\\"theme\\\":\\\"dark\\\"}\"}'"
+    },
+    {
+      "name": "Chats - Delete or Leave",
+      "method": "DELETE",
+      "url": "/chats/{id}",
+      "curl": "curl -X DELETE \"http://localhost:8080/chats/<ID>\" -H \"Authorization: Bearer <TOKEN>\" -i"
+    },
+
+    {
+      "name": "Messages - List in Chat",
+      "method": "GET",
+      "url": "/chats/{chatId}/messages",
+      "curl": "curl -X GET \"http://localhost:8080/chats/<CHAT_ID>/messages?page=0&size=50&sort=createdAt,desc\" -H \"Authorization: Bearer <TOKEN>\""
+    },
+    {
+      "name": "Messages - Send",
+      "method": "POST",
+      "url": "/chats/{chatId}/messages",
+      "curl": "curl -X POST \"http://localhost:8080/chats/<CHAT_ID>/messages\" -H \"Authorization: Bearer <TOKEN>\" -H \"Content-Type: application/json\" -d '{\"text\":\"Hello\",\"type\":\"TEXT\"}'"
+    },
+    {
+      "name": "Messages - Update",
+      "method": "PUT",
+      "url": "/messages/{id}",
+      "curl": "curl -X PUT \"http://localhost:8080/messages/<MESSAGE_ID>\" -H \"Authorization: Bearer <TOKEN>\" -H \"Content-Type: application/json\" -d '{\"text\":\"Edited\"}'"
+    },
+    {
+      "name": "Messages - Delete",
+      "method": "DELETE",
+      "url": "/messages/{id}",
+      "curl": "curl -X DELETE \"http://localhost:8080/messages/<MESSAGE_ID>\" -H \"Authorization: Bearer <TOKEN>\" -i"
+    },
+    {
+      "name": "Messages - Mark Read",
+      "method": "POST",
+      "url": "/messages/{id}/read",
+      "curl": "curl -X POST \"http://localhost:8080/messages/<MESSAGE_ID>/read\" -H \"Authorization: Bearer <TOKEN>\""
+    },
+
+    {
+      "name": "Participants - List",
+      "method": "GET",
+      "url": "/chats/{chatId}/participants",
+      "curl": "curl -X GET \"http://localhost:8080/chats/<CHAT_ID>/participants\" -H \"Authorization: Bearer <TOKEN>\""
+    },
+    {
+      "name": "Participants - Add",
+      "method": "POST",
+      "url": "/chats/{chatId}/participants",
+      "curl": "curl -X POST \"http://localhost:8080/chats/<CHAT_ID>/participants\" -H \"Authorization: Bearer <TOKEN>\" -H \"Content-Type: application/json\" -d '{\"userId\":\"<USER_ID>\",\"role\":\"MEMBER\"}'"
+    },
+    {
+      "name": "Participants - Update Role",
+      "method": "PUT",
+      "url": "/chats/{chatId}/participants/{userId}",
+      "curl": "curl -X PUT \"http://localhost:8080/chats/<CHAT_ID>/participants/<USER_ID>\" -H \"Authorization: Bearer <TOKEN>\" -H \"Content-Type: application/json\" -d '{\"role\":\"ADMIN\"}'"
+    },
+    {
+      "name": "Participants - Remove",
+      "method": "DELETE",
+      "url": "/chats/{chatId}/participants/{userId}",
+      "curl": "curl -X DELETE \"http://localhost:8080/chats/<CHAT_ID>/participants/<USER_ID>\" -H \"Authorization: Bearer <TOKEN>\" -i"
+    },
+
+    {
+      "name": "Files - Upload",
+      "method": "POST",
+      "url": "/files/upload",
+      "curl": "curl -X POST \"http://localhost:8080/files/upload\" -H \"Authorization: Bearer <TOKEN>\" -F \"file=@path/to/file\""
+    },
+    {
+      "name": "Files - Get by ID",
+      "method": "GET",
+      "url": "/files/{id}",
+      "curl": "curl -X GET \"http://localhost:8080/files/<FILE_ID>\" -H \"Authorization: Bearer <TOKEN>\""
+    },
+    {
+      "name": "Files - Delete",
+      "method": "DELETE",
+      "url": "/files/{id}",
+      "curl": "curl -X DELETE \"http://localhost:8080/files/<FILE_ID>\" -H \"Authorization: Bearer <TOKEN>\" -i"
+    },
+    {
+      "name": "Files - Raw (Public)",
+      "method": "GET",
+      "url": "/files/raw/{storedName}",
+      "curl": "curl -X GET \"http://localhost:8080/files/raw/<STORED_NAME>\" -L"
+    },
+
+    {
+      "name": "Health",
+      "method": "GET",
+      "url": "/actuator/health",
+      "curl": "curl -X GET \"http://localhost:8080/actuator/health\""
+    },
+    {
+      "name": "OpenAPI Docs JSON",
+      "method": "GET",
+      "url": "/v3/api-docs",
+      "curl": "curl -X GET \"http://localhost:8080/v3/api-docs\""
+    },
+    {
+      "name": "Swagger UI",
+      "method": "GET",
+      "url": "/swagger-ui.html",
+      "curl": "curl -X GET -I \"http://localhost:8080/swagger-ui.html\""
+    }
+  ]
+}

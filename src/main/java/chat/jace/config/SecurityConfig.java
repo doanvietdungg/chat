@@ -49,7 +49,7 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/actuator/health",
-                                "/auth/**",
+                                "/api/v1/auth/**",
                                 "/ws/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

@@ -12,6 +12,20 @@ public final class SecurityUtils {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) throw new IllegalStateException("Unauthenticated");
         return UUID.fromString(auth.getName());
-        
+    }
+    
+    public static UUID getCurrentUserId() {
+        return currentUserIdOrThrow();
+    }
+    
+    public static String getCurrentUsername() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null) throw new IllegalStateException("Unauthenticated");
+        return auth.getName();
+    }
+    
+    public static boolean isAuthenticated() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.isAuthenticated() && auth.getName() != null;
     }
 }

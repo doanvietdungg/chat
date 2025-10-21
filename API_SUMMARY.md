@@ -187,6 +187,99 @@ Auth: Bearer JWT in `Authorization: Bearer <token>` (except where noted).
 { "chatId": UUID, "messageId": UUID }
 ```
 
+- `/app/presence.update`
+```
+{ "status": "ONLINE|OFFLINE|AWAY|BUSY" }
+```
+
+- `/app/presence.heartbeat`
+```
+{} (empty payload for heartbeat)
+```
+
+### Additional Subscriptions
+- `/topic/presence` — global presence updates:
+  - `presence.changed` events with `{ userId, status, timestamp, type }`
+
+## User Search
+- **POST** `/users/search`
+  - Body: `{ "query": string, "limit"?: number }`
+  - Resp: `UserSearchResponse[]`
+  - Auth: Yes
+
+- **GET** `/users/search/recent`
+  - Resp: `UserSearchResponse[]` (recent searches)
+  - Auth: Yes
+
+- **GET** `/users/search/suggested`
+  - Resp: `UserSearchResponse[]` (suggested contacts)
+  - Auth: Yes
+
+- **POST** `/users/search/history/{userId}`
+  - Resp: `{ status: "ok" }`
+  - Auth: Yes
+
+- **DELETE** `/users/search/history`
+  - Resp: `{ status: "ok" }`
+  - Auth: Yes
+
+`UserSearchResponse`:
+```
+{
+  id: UUID,
+  username: string,
+  email: string,
+  avatarUrl: string|null,
+  presenceStatus: "ONLINE|OFFLINE|AWAY|BUSY",
+  lastSeenAt: string|null,
+  isContact: boolean,
+  mutualContactsCount: number,
+  displayName: string|null
+}
+```
+
+## Contacts
+- **POST** `/contacts`
+  - Body: `{ "contactUserId": UUID, "displayName"?: string }`
+  - Resp: `ContactResponse`
+  - Auth: Yes
+
+- **GET** `/contacts`
+  - Query: pagination via `Pageable`
+  - Resp: `Page<ContactResponse>`
+  - Auth: Yes
+
+- **GET** `/contacts/{contactUserId}`
+  - Resp: `ContactResponse`
+  - Auth: Yes
+
+- **PUT** `/contacts/{contactUserId}`
+  - Body: `{ "displayName"?: string }`
+  - Resp: `ContactResponse`
+  - Auth: Yes
+
+- **DELETE** `/contacts/{contactUserId}`
+  - Resp: `204 No Content`
+  - Auth: Yes
+
+`ContactResponse`:
+```
+{
+  id: UUID,
+  userId: UUID,
+  contactUserId: UUID,
+  displayName: string|null,
+  username: string,
+  email: string,
+  avatarUrl: string|null,
+  presenceStatus: "ONLINE|OFFLINE|AWAY|BUSY",
+  lastSeenAt: string|null,
+  mutualContactsCount: number,
+  createdAt: string,
+  updatedAt: string
+}
+```
+
 ## Health & Docs
 - **GET** `/actuator/health`
 - **GET** `/v3/api-docs`

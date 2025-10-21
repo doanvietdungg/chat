@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/chats")
+@RequestMapping("/api/v1/chats")
 @RequiredArgsConstructor
 public class ChatController {
 

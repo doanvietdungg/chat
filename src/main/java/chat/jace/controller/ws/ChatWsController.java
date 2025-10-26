@@ -33,15 +33,35 @@ public class ChatWsController {
         if (userId == null) {
             return; // ignore unauthenticated messages
         }
-        Message msg = Message.builder()
-                .chatId(payload.getChatId())
+        // If chatId exists: normal chat message, persist and broadcast to chat topic
+        if (payload.getChatId() != null) {
+            Message msg = Message.builder()
+                    .chatId(payload.getChatId())
+                    .authorId(UUID.fromString(userId))
+                    .text(payload.getText())
+                    .type(payload.getType() == null ? MessageType.TEXT : payload.getType())
+                    .build();
+            msg = messageRepository.save(msg);
+            messagingTemplate.convertAndSend("/topic/chats/" + payload.getChatId() + "/messages", msg);
+            return;
+        }
+
+        // First-message use case: no chat yet, route to recipient's user channel
+        UUID recipientId = payload.getRecipientId();
+        if (recipientId == null) {
+            return; // insufficient info to deliver first message
+        }
+        Message provisional = Message.builder()
+                .chatId(null)
                 .authorId(UUID.fromString(userId))
                 .text(payload.getText())
                 .type(payload.getType() == null ? MessageType.TEXT : payload.getType())
                 .build();
-        msg = messageRepository.save(msg);
-
-        messagingTemplate.convertAndSend("/topic/chats/" + payload.getChatId(), msg);
+        messagingTemplate.convertAndSend("/user/" + recipientId + "/events",
+                java.util.Map.of(
+                        "type", "message.first",
+                        "payload", provisional
+                ));
     }
 
     @MessageMapping("/typing")

@@ -82,6 +82,9 @@ public class ChatService {
                 .userId(me)
                 .role(ParticipantRole.OWNER)
                 .build());
+        // recipients to notify about chat.created
+        java.util.Set<java.util.UUID> recipients = new java.util.HashSet<>();
+        recipients.add(me);
 
         // If PRIVATE with otherUserId, add the other user as MEMBER
         if (type == ChatType.PRIVATE && req.getOtherUserId() != null) {
@@ -92,15 +95,7 @@ public class ChatService {
                         .userId(other)
                         .role(ParticipantRole.MEMBER)
                         .build());
-                // Broadcast participant.added
-                messagingTemplate.convertAndSend("/topic/chats/" + chat.getId() + "/events",
-                        java.util.Map.of("type", "participant.added",
-                                "payload", java.util.Map.of(
-                                        "chatId", chat.getId(),
-                                        "userId", other,
-                                        "role", ParticipantRole.MEMBER,
-                                        "joinedAt", java.time.OffsetDateTime.now()
-                                )));
+                recipients.add(other);
             }
         }
 
@@ -118,20 +113,20 @@ public class ChatService {
                         .userId(uid)
                         .role(role)
                         .build());
-                // Broadcast participant.added
-                messagingTemplate.convertAndSend("/topic/chats/" + chat.getId() + "/events",
-                        java.util.Map.of("type", "participant.added",
-                                "payload", java.util.Map.of(
-                                        "chatId", chat.getId(),
-                                        "userId", uid,
-                                        "role", role,
-                                        "joinedAt", java.time.OffsetDateTime.now()
-                                )));
+                recipients.add(uid);
             }
         }
 
-        messagingTemplate.convertAndSend("/topic/chat.updated", toResponse(chat));
-        return toResponse(chat);
+        var resp = toResponse(chat);
+        // Send chat.created to each participant's user-specific events channel
+        for (var uid : recipients) {
+            messagingTemplate.convertAndSend("/user/" + uid + "/events",
+                    java.util.Map.of(
+                            "type", "chat.created",
+                            "payload", resp
+                    ));
+        }
+        return resp;
     }
 
     public ChatResponse get(UUID chatId) {

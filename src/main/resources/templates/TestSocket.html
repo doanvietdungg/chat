@@ -2,75 +2,542 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Chat WS Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test - Chat App</title>
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h2 { color: #333; margin-bottom: 20px; }
+        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .section h3 { margin: 0 0 15px 0; color: #333; font-size: 18px; border-bottom: 2px solid #007bff; padding-bottom: 8px; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; color: #555; font-size: 14px; }
+        input, select, textarea { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #007bff; }
+        textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+        button { padding: 10px 20px; margin: 5px 5px 5px 0; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; }
+        button:hover { background: #0056b3; transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+        button:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #c82333; }
+        button.success { background: #28a745; }
+        button.success:hover { background: #218838; }
+        button.warning { background: #ffc107; color: #000; }
+        button.warning:hover { background: #e0a800; }
+        .status { display: inline-block; padding: 5px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; }
+        .status.connected { background: #28a745; color: white; }
+        .status.disconnected { background: #dc3545; color: white; }
+        #log { background: #1e1e1e; color: #d4d4d4; padding: 15px; height: 400px; overflow-y: auto; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; border-radius: 4px; line-height: 1.5; }
+        #messages { background: #fff; padding: 15px; height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; }
+        .message-item { padding: 10px; margin-bottom: 10px; border-left: 3px solid #007bff; background: #f8f9fa; border-radius: 4px; }
+        .message-item .time { font-size: 11px; color: #666; }
+        .message-item .content { margin-top: 5px; color: #333; }
+        .message-item.event { border-left-color: #ffc107; }
+        .message-item.typing { border-left-color: #17a2b8; }
+        .message-item.error { border-left-color: #dc3545; background: #ffe6e6; }
+        .quick-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .subscriptions { margin-top: 15px; }
+        .sub-item { display: inline-block; padding: 5px 10px; margin: 5px 5px 0 0; background: #e7f3ff; border: 1px solid #007bff; border-radius: 4px; font-size: 12px; }
+        .full-width { grid-column: 1 / -1; }
+    </style>
 </head>
 <body>
-<h2>WebSocket Test</h2>
-<label>Chat ID: </label>
-<input id="chatId" value="1" />
-<br><br>
+<div class="container">
+<h2>🔌 WebSocket Test Interface</h2>
 
-<label>Message: </label>
-<input id="text" oninput="sendTyping(true)" onblur="sendTyping(false)" />
-<button onclick="sendMessage()">Send</button>
+<div class="section">
+    <h3>🔌 Connection</h3>
+    <div class="form-group">
+        <label>Server URL:</label>
+        <input type="text" id="serverUrl" value="http://localhost:8080" />
+    </div>
+    <div class="form-group">
+        <label>User ID (for testing without token):</label>
+        <input type="text" id="userId" placeholder="Your UUID - e.g., 3a2e9f6a-5c3e-4c2b-b2c8-5f4c0d83b91f" value="3a2e9f6a-5c3e-4c2b-b2c8-5f4c0d83b91f" />
+    </div>
+    <div class="form-group">
+        <label>JWT Token (Optional):</label>
+        <input type="text" id="jwtToken" placeholder="Paste your JWT token here (optional)" />
+    </div>
+    <div class="quick-actions">
+        <button onclick="connect()" class="success">Connect</button>
+        <button onclick="disconnect()" class="danger">Disconnect</button>
+        <span id="status" class="status disconnected">Disconnected</span>
+    </div>
+    <div class="subscriptions">
+        <strong>Active Subscriptions:</strong>
+        <div id="subscriptionList"></div>
+    </div>
+</div>
 
-<h3>Logs</h3>
-<pre id="log"></pre>
+<div class="layout">
+    <!-- Left Column -->
+    <div>
+        <div class="section">
+            <h3>👤 Subscribe to User Queue Events</h3>
+            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">
+                Subscribe to <code>/user/queue/events</code> to receive messages sent to your user session.
+                Enter your User ID below (used for sending messages to you).
+            </p>
+            <div class="form-group">
+                <label>Your User ID (for reference):</label>
+                <input type="text" id="subscribeUserId" placeholder="UUID - e.g., 3a2e9f6a-5c3e-4c2b-b2c8-5f4c0d83b91f" />
+            </div>
+            <button onclick="subscribeToUserEvents()" class="success">Subscribe to /user/queue/events</button>
+            <button onclick="unsubscribeFromUserEvents()" class="danger">Unsubscribe</button>
+        </div>
+
+        <div class="section">
+            <h3>📬 Subscribe to Chat</h3>
+            <div class="form-group">
+                <label>Chat ID:</label>
+                <input type="text" id="chatId" value="1" />
+            </div>
+            <button onclick="subscribeToChat()" class="success">Subscribe</button>
+            <button onclick="unsubscribeFromChat()" class="danger">Unsubscribe</button>
+        </div>
+
+        <div class="section">
+            <h3>💬 Send Message</h3>
+            <div class="form-group">
+                <label>Chat ID:</label>
+                <input type="text" id="sendChatId" value="1" />
+            </div>
+            <div class="form-group">
+                <label>Recipient ID (Optional - for user events):</label>
+                <input type="text" id="sendRecipientId" placeholder="UUID to also send to /user/{id}/events" />
+            </div>
+            <div class="form-group">
+                <label>Message Text:</label>
+                <textarea id="messageText" placeholder="Type your message..." oninput="sendTyping(true)" onblur="sendTyping(false)"></textarea>
+            </div>
+            <div class="quick-actions">
+                <button onclick="sendMessage()" class="success">Send Message</button>
+                <button onclick="document.getElementById('messageText').value = ''">Clear</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>✉️ First Message (New Chat)</h3>
+            <div class="form-group">
+                <label>Recipient ID:</label>
+                <input type="text" id="recipientId" placeholder="UUID of recipient user" />
+            </div>
+            <div class="form-group">
+                <label>Message Text:</label>
+                <textarea id="firstMessageText" placeholder="First message text..."></textarea>
+            </div>
+            <button onclick="sendFirstMessage()" class="success">Send First Message</button>
+        </div>
+
+        <div class="section">
+            <h3>👤 Presence</h3>
+            <div class="form-group">
+                <label>Status:</label>
+                <select id="presenceStatus">
+                    <option value="ONLINE">ONLINE</option>
+                    <option value="AWAY">AWAY</option>
+                    <option value="BUSY">BUSY</option>
+                    <option value="OFFLINE">OFFLINE</option>
+                </select>
+            </div>
+            <div class="quick-actions">
+                <button onclick="updatePresence()">Update Presence</button>
+                <button onclick="sendHeartbeat()" class="warning">Send Heartbeat</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>✓ Read Receipt</h3>
+            <div class="form-group">
+                <label>Chat ID:</label>
+                <input type="text" id="readChatId" placeholder="Chat ID" />
+            </div>
+            <div class="form-group">
+                <label>Message ID:</label>
+                <input type="text" id="readMessageId" placeholder="Message UUID" />
+            </div>
+            <button onclick="sendReadReceipt()">Send Read Receipt</button>
+        </div>
+    </div>
+
+    <!-- Right Column -->
+    <div>
+        <div class="section">
+            <h3>📨 Received Messages</h3>
+            <button onclick="clearMessages()" class="warning">Clear Messages</button>
+            <div id="messages"></div>
+        </div>
+
+        <div class="section">
+            <h3>📋 Console Logs</h3>
+            <button onclick="clearLog()" class="warning">Clear Logs</button>
+            <pre id="log"></pre>
+        </div>
+    </div>
+</div>
 
 <script>
     let stompClient = null;
+    let subscriptions = {};
 
-    function log(msg) {
+    function log(msg, type = 'info') {
         const logEl = document.getElementById("log");
-        logEl.textContent += msg + "\n";
+        const timestamp = new Date().toLocaleTimeString();
+        const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'message' ? '💬' : 'ℹ️';
+        logEl.textContent += `[${timestamp}] ${prefix} ${msg}\n`;
+        logEl.scrollTop = logEl.scrollHeight;
     }
 
-    function connect() {
-        const socket = new SockJS("http://localhost:8080/ws");
-        stompClient = Stomp.over(socket);
-
-        stompClient.connect({}, (frame) => {
-            log("✅ Connected: " + frame);
-            const chatId = document.getElementById("chatId").value;
-
-            // subscribe tin nhắn
-            stompClient.subscribe(`/topic/chats/${chatId}`, (message) => {
-                log("💬 Message: " + message.body);
-            });
-
-            // subscribe typing
-            stompClient.subscribe(`/topic/chats/${chatId}/typing`, (event) => {
-                const data = JSON.parse(event.body);
-                log(`⌨️ Typing event: user ${data.userId} is ${data.typing ? "typing..." : "stopped"}`);
-            });
-        });
+    function clearLog() {
+        document.getElementById("log").textContent = "";
     }
 
-    function sendMessage() {
-        const chatId = document.getElementById("chatId").value;
-        const text = document.getElementById("text").value;
-
-        stompClient.send("/app/messages.send", {}, JSON.stringify({
-            chatId: chatId,
-            text: text
-        }));
-        document.getElementById("text").value = "";
-        sendTyping(false);
+    function addMessage(content, type = 'message') {
+        const messagesEl = document.getElementById("messages");
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message-item ${type}`;
+        
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'time';
+        timeDiv.textContent = new Date().toLocaleTimeString();
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        contentDiv.textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+        
+        messageDiv.appendChild(timeDiv);
+        messageDiv.appendChild(contentDiv);
+        messagesEl.appendChild(messageDiv);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    function sendTyping(isTyping) {
-        const chatId = document.getElementById("chatId").value;
-        if (stompClient && stompClient.connected) {
-            stompClient.send("/app/typing", {}, JSON.stringify({
-                chatId: chatId,
-                typing: isTyping
-            }));
+    function clearMessages() {
+        document.getElementById("messages").innerHTML = "";
+    }
+
+    function updateSubscriptionList() {
+        const listEl = document.getElementById("subscriptionList");
+        const subs = Object.keys(subscriptions);
+        if (subs.length === 0) {
+            listEl.innerHTML = '<span style="color: #999; font-size: 12px;">No active subscriptions</span>';
+        } else {
+            listEl.innerHTML = subs.map(s => `<span class="sub-item">${s}</span>`).join('');
         }
     }
 
-    connect();
+    function updateStatus(connected) {
+        const statusEl = document.getElementById("status");
+        if (connected) {
+            statusEl.textContent = "Connected";
+            statusEl.className = "status connected";
+        } else {
+            statusEl.textContent = "Disconnected";
+            statusEl.className = "status disconnected";
+        }
+    }
+
+    function connect() {
+        const serverUrl = document.getElementById("serverUrl").value.trim();
+        const userId = document.getElementById("userId").value.trim();
+        const jwtToken = document.getElementById("jwtToken").value.trim();
+
+        const socket = new SockJS(serverUrl + "/ws");
+        stompClient = Stomp.over(socket);
+        stompClient.debug = null; // tắt log nếu không cần
+
+        const headers = {};
+        if (jwtToken) {
+            headers['Authorization'] = 'Bearer ' + jwtToken;
+            log("🔐 Connecting with JWT...");
+        } else if (userId) {
+            headers['user-id'] = userId; // 🟢 đổi sang user-id
+            log("🧪 Connecting with user-id: " + userId);
+        } else {
+            log("⚠️ Connecting without authentication...");
+        }
+
+        stompClient.connect(headers, function(frame) {
+            log("✅ Connected successfully!", 'success');
+            updateStatus(true);
+
+            log("✅ Subscribed to /user/events");
+            updateSubscriptionList();
+        }, function(error) {
+            log("❌ Connection error: " + error, 'error');
+            updateStatus(false);
+        });
+    }
+
+
+    function disconnect() {
+        if (stompClient !== null) {
+            stompClient.disconnect(function() {
+                log("Disconnected", 'success');
+                updateStatus(false);
+                subscriptions = {};
+                updateSubscriptionList();
+            });
+        }
+    }
+
+    function subscribeToUserEvents() {
+        if (!stompClient || !stompClient.connected) {
+            log("Not connected! Please connect first.", 'error');
+            return;
+        }
+
+        const userId = document.getElementById("subscribeUserId").value.trim();
+        if (!userId) {
+            log("Please enter a User ID", 'error');
+            return;
+        }
+
+        // Check if already subscribed
+        if (subscriptions[`user-${userId}-events`]) {
+            log(`Already subscribed to user ${userId} events`, 'error');
+            return;
+        }
+
+        // Subscribe to topic-based user events (works without authentication)
+        subscriptions[`user-${userId}-events`] = stompClient.subscribe('/user/test/events', function(message) {
+            log("[USER " + userId + " TOPIC EVENT] " + message.body, 'message');
+            addMessage("[USER " + userId + " TOPIC EVENT] " + message.body, 'event');
+        });
+
+        log("✅ Subscribed to /user/" + userId + "/events", 'success');
+        updateSubscriptionList();
+    }
+
+    function unsubscribeFromUserEvents() {
+        const userId = document.getElementById("subscribeUserId").value.trim();
+        if (!userId) {
+            log("Please enter a User ID", 'error');
+            return;
+        }
+        
+        const key = `user-${userId}-topic-events`;
+        if (subscriptions[key]) {
+            subscriptions[key].unsubscribe();
+            delete subscriptions[key];
+            log("Unsubscribed from user " + userId + " topic events", 'success');
+            updateSubscriptionList();
+        } else {
+            log("Not subscribed to user " + userId + " topic events", 'error');
+        }
+    }
+
+    function subscribeToChat() {
+        if (!stompClient || !stompClient.connected) {
+            log("Not connected! Please connect first.", 'error');
+            return;
+        }
+
+        const chatId = document.getElementById("chatId").value.trim();
+        if (!chatId) {
+            log("Please enter a Chat ID", 'error');
+            return;
+        }
+
+        // Unsubscribe if already subscribed
+        if (subscriptions[`chat-${chatId}-messages`]) {
+            log(`Already subscribed to chat ${chatId}`, 'error');
+            return;
+        }
+
+        // Subscribe to messages
+        subscriptions[`chat-${chatId}-messages`] = stompClient.subscribe('/topic/chats/' + chatId + '/messages', function(message) {
+            log("[CHAT " + chatId + "] Message: " + message.body, 'message');
+            addMessage("[CHAT " + chatId + "] " + message.body, 'message');
+        });
+
+        // Subscribe to typing indicators
+        subscriptions[`chat-${chatId}-typing`] = stompClient.subscribe('/topic/chats/' + chatId + '/typing', function(message) {
+            try {
+                const data = JSON.parse(message.body);
+                const typingMsg = `User ${data.userId} is ${data.typing ? 'typing...' : 'stopped typing'}`;
+                log(`[CHAT ${chatId}] ${typingMsg}`, 'info');
+                addMessage(`[CHAT ${chatId}] ${typingMsg}`, 'typing');
+            } catch (e) {
+                log("Typing event: " + message.body, 'info');
+            }
+        });
+
+        // Subscribe to events
+        subscriptions[`chat-${chatId}-events`] = stompClient.subscribe('/topic/chats/' + chatId + '/events', function(message) {
+            log("[CHAT " + chatId + "] Event: " + message.body, 'message');
+            addMessage("[CHAT " + chatId + " EVENT] " + message.body, 'event');
+        });
+
+        log("Subscribed to chat " + chatId + " (messages, typing, events)", 'success');
+        updateSubscriptionList();
+    }
+
+    function unsubscribeFromChat() {
+        const chatId = document.getElementById("chatId").value.trim();
+        if (!chatId) {
+            log("Please enter a Chat ID", 'error');
+            return;
+        }
+
+        const keys = [`chat-${chatId}-messages`, `chat-${chatId}-typing`, `chat-${chatId}-events`];
+        let unsubscribed = false;
+        
+        keys.forEach(key => {
+            if (subscriptions[key]) {
+                subscriptions[key].unsubscribe();
+                delete subscriptions[key];
+                unsubscribed = true;
+            }
+        });
+
+        if (unsubscribed) {
+            log("Unsubscribed from chat " + chatId, 'success');
+            updateSubscriptionList();
+        } else {
+            log("Not subscribed to chat " + chatId, 'error');
+        }
+    }
+
+    function sendMessage() {
+        if (!stompClient || !stompClient.connected) {
+            log("Not connected!", 'error');
+            return;
+        }
+
+        const chatId = document.getElementById("sendChatId").value.trim();
+        const recipientId = document.getElementById("sendRecipientId").value.trim();
+        const text = document.getElementById("messageText").value.trim();
+
+        if (!text) {
+            log("Please enter Message Text", 'error');
+            return;
+        }
+
+        if (!chatId && !recipientId) {
+            log("Please enter either Chat ID or Recipient ID", 'error');
+            return;
+        }
+
+        const payload = {
+            text: text,
+            type: "TEXT"
+        };
+
+        if (chatId) {
+            payload.chatId = chatId;
+        }
+
+        if (recipientId) {
+            payload.recipientId = recipientId;
+        }
+
+        stompClient.send("/app/messages.send", {}, JSON.stringify(payload));
+        
+        let logMsg = "✉️ Sent message: " + text;
+        if (chatId) logMsg += " [to chat " + chatId + "]";
+        if (recipientId) logMsg += " [to user " + recipientId + " events]";
+        log(logMsg, 'success');
+        
+        document.getElementById("messageText").value = "";
+        sendTyping(false);
+    }
+
+    function sendFirstMessage() {
+        if (!stompClient || !stompClient.connected) {
+            log("Not connected!", 'error');
+            return;
+        }
+
+        const recipientId = document.getElementById("recipientId").value.trim();
+        const text = document.getElementById("firstMessageText").value.trim();
+
+        if (!recipientId || !text) {
+            log("Please enter both Recipient ID and Message Text", 'error');
+            return;
+        }
+
+        const payload = {
+            recipientId: recipientId,
+            text: text,
+            type: "TEXT"
+        };
+
+        stompClient.send("/app/messages.send", {}, JSON.stringify(payload));
+        log("Sent first message to recipient " + recipientId + ": " + text, 'success');
+        
+        document.getElementById("firstMessageText").value = "";
+    }
+
+    function sendTyping(isTyping) {
+        if (!stompClient || !stompClient.connected) {
+            return;
+        }
+
+        const chatId = document.getElementById("sendChatId").value.trim();
+        if (!chatId) return;
+
+        const payload = {
+            chatId: chatId,
+            typing: isTyping
+        };
+
+        stompClient.send("/app/typing", {}, JSON.stringify(payload));
+    }
+
+    function updatePresence() {
+        if (!stompClient || !stompClient.connected) {
+            log("Not connected!", 'error');
+            return;
+        }
+
+        const status = document.getElementById("presenceStatus").value;
+        const payload = {
+            status: status
+        };
+
+        stompClient.send("/app/presence.update", {}, JSON.stringify(payload));
+        log("Updated presence to: " + status, 'success');
+    }
+
+    function sendHeartbeat() {
+        if (!stompClient || !stompClient.connected) {
+            log("Not connected!", 'error');
+            return;
+        }
+
+        stompClient.send("/app/presence.heartbeat", {}, JSON.stringify({}));
+        log("Sent heartbeat", 'success');
+    }
+
+    function sendReadReceipt() {
+        if (!stompClient || !stompClient.connected) {
+            log("Not connected!", 'error');
+            return;
+        }
+
+        const chatId = document.getElementById("readChatId").value.trim();
+        const messageId = document.getElementById("readMessageId").value.trim();
+
+        if (!chatId || !messageId) {
+            log("Please enter both Chat ID and Message ID", 'error');
+            return;
+        }
+
+        const payload = {
+            chatId: chatId,
+            messageId: messageId
+        };
+
+        stompClient.send("/app/read", {}, JSON.stringify(payload));
+        log("Sent read receipt for message " + messageId + " in chat " + chatId, 'success');
+    }
 </script>
+</div>
 </body>
 </html>

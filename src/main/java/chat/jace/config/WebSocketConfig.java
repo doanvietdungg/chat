@@ -53,7 +53,7 @@
                     .setSystemPasscode(rabbitSystemPasscode)
                     .setVirtualHost(rabbitVhost);
             } else {
-                config.enableSimpleBroker("/topic", "/queue");
+                config.enableSimpleBroker("/topic", "/test", "/queue");
             }
             config.setApplicationDestinationPrefixes("/app");
             config.setUserDestinationPrefix("/user");

@@ -67,7 +67,7 @@ public class ChatWsController {
             log.info("Attempting to send message to user: {}", recipientIdStr);
             log.info("Message payload: type={}, text={}", msg != null ? "message.sent" : "message.first", eventMsg.getText());
             try {
-                messagingTemplate.convertAndSendToUser(recipientIdStr, "/test/events",
+                messagingTemplate.convertAndSendToUser(recipientIdStr, "/topic/events",
                         java.util.Map.of(
                                 "type", msg != null ? "message.sent" : "message.first",
                                 "payload", eventMsg

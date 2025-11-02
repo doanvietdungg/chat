@@ -2,6 +2,7 @@ package chat.jace.service;
 
 import chat.jace.domain.Chat;
 import chat.jace.domain.Participant;
+import chat.jace.domain.User;
 import chat.jace.domain.enums.ChatType;
 import chat.jace.domain.enums.ParticipantRole;
 import chat.jace.dto.chat.ChatCreateRequest;
@@ -9,6 +10,7 @@ import chat.jace.dto.chat.ChatResponse;
 import chat.jace.dto.chat.ChatUpdateRequest;
 import chat.jace.repository.ChatRepository;
 import chat.jace.repository.ParticipantRepository;
+import chat.jace.repository.UserRepository;
 import chat.jace.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -27,6 +29,7 @@ public class ChatService {
 
     private final ChatRepository chatRepository;
     private final ParticipantRepository participantRepository;
+    private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     public Page<ChatResponse> listMyChats(Pageable pageable) {
@@ -38,7 +41,7 @@ public class ChatService {
         int start = (int) pageable.getOffset();
         int end = Math.min(start + pageable.getPageSize(), chats.size());
         List<ChatResponse> content = chats.subList(Math.min(start, chats.size()), end)
-                .stream().map(ChatService::toResponse).toList();
+                .stream().map(chat -> toResponse(chat, me)).toList();
         return new PageImpl<>(content, pageable, chats.size());
     }
 
@@ -61,16 +64,19 @@ public class ChatService {
                 var existingOpt = chatRepository.findById(part.getChatId());
                 if (existingOpt.isPresent() && existingOpt.get().getType() == ChatType.PRIVATE) {
                     if (participantRepository.existsByChatIdAndUserId(existingOpt.get().getId(), other)) {
-                        return toResponse(existingOpt.get());
+                        return toResponse(existingOpt.get(), me);
                     }
                 }
             }
         }
 
         // Create chat
+        // For PRIVATE chats, don't save title (will be calculated dynamically)
+        String titleToSave = (type == ChatType.PRIVATE) ? null : req.getTitle();
+        
         Chat chat = Chat.builder()
                 .type(type)
-                .title(req.getTitle())
+                .title(titleToSave)
                 .description(req.getDescription())
                 .createdBy(me)
                 .build();
@@ -117,7 +123,7 @@ public class ChatService {
             }
         }
 
-        var resp = toResponse(chat);
+        var resp = toResponse(chat, me);
         // Send chat.created to each participant's user-specific events channel
         for (var uid : recipients) {
             messagingTemplate.convertAndSend("/user/" + uid + "/events",
@@ -132,7 +138,7 @@ public class ChatService {
     public ChatResponse get(UUID chatId) {
         UUID me = SecurityUtils.currentUserIdOrThrow();
         requireMember(chatId, me);
-        return toResponse(chatRepository.findById(chatId).orElseThrow());
+        return toResponse(chatRepository.findById(chatId).orElseThrow(), me);
     }
 
     @Transactional
@@ -144,7 +150,7 @@ public class ChatService {
         if (req.getDescription() != null) chat.setDescription(req.getDescription());
         if (req.getSettings() != null) chat.setSettings(req.getSettings());
         chat = chatRepository.save(chat);
-        var resp = toResponse(chat);
+        var resp = toResponse(chat, me);
         messagingTemplate.convertAndSend("/topic/chats/"+chatId+"/updated", resp);
         return resp;
     }
@@ -163,17 +169,35 @@ public class ChatService {
         }
     }
 
-    private void requireMember(UUID chatId, UUID userId) {
+    public void requireMember(UUID chatId, UUID userId) {
         if (!participantRepository.existsByChatIdAndUserId(chatId, userId)) {
             throw new IllegalArgumentException("Not a chat participant");
         }
     }
 
-    private static ChatResponse toResponse(Chat chat) {
+    private ChatResponse toResponse(Chat chat, UUID currentUserId) {
+        String displayTitle = chat.getTitle();
+        
+        // For PRIVATE chats, calculate title dynamically based on the other user
+        if (chat.getType() == ChatType.PRIVATE) {
+            // Find the other participant (not the current user)
+            var participants = participantRepository.findByChatId(chat.getId());
+            var otherUser = participants.stream()
+                    .filter(p -> !p.getUserId().equals(currentUserId))
+                    .findFirst();
+            
+            if (otherUser.isPresent()) {
+                // Get the other user's name
+                displayTitle = userRepository.findById(otherUser.get().getUserId())
+                        .map(User::getUsername)
+                        .orElse("Unknown User");
+            }
+        }
+        
         return ChatResponse.builder()
                 .id(chat.getId())
                 .type(chat.getType())
-                .title(chat.getTitle())
+                .title(displayTitle)
                 .description(chat.getDescription())
                 .createdBy(chat.getCreatedBy())
                 .createdAt(chat.getCreatedAt())

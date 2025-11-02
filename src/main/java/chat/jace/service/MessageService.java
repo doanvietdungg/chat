@@ -81,7 +81,7 @@ public class MessageService {
         }
     }
 
-    private static MessageResponse toResponse(Message m) {
+    public static MessageResponse toResponse(Message m) {
         return MessageResponse.builder()
                 .id(m.getId())
                 .chatId(m.getChatId())

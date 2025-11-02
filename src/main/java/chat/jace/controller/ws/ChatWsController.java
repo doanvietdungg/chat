@@ -79,15 +79,15 @@ public class ChatWsController {
         }
     }
 
-//    @MessageMapping("/typing")
-//    public void typing(@Valid TypingPayload payload, Principal principal) {
-//        String userId = principal != null ? principal.getName() : null;
-//        if (userId == null) return;
-//        Map<String, Object> evt = new HashMap<>();
-//        evt.put("userId", userId);
-//        evt.put("typing", payload.getTyping());
-//        messagingTemplate.convertAndSend("/topic/chats/" + payload.getChatId() + "/typing", evt);
-//    }
+    @MessageMapping("/typing")
+    public void typing(@Valid TypingPayload payload, Principal principal) {
+        String userId = principal != null ? principal.getName() : null;
+        if (userId == null) return;
+        Map<String, Object> evt = new HashMap<>();
+        evt.put("userId", userId);
+        evt.put("isTyping", payload.getTyping());
+        messagingTemplate.convertAndSend("/topic/chats/" + payload.getChatId() + "/typing", evt);
+    }
 
     @MessageMapping("/read")
     public void read(@Valid ReadReceiptPayload payload, Principal principal) {

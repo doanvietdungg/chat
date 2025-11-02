@@ -184,6 +184,30 @@ curl -X POST http://localhost:8080/api/v1/chats/650e8400-e29b-41d4-a716-44665544
   }'
 ```
 
+### Pinned Message APIs
+```bash
+# Ghim một tin nhắn
+curl -X POST http://localhost:8080/api/v1/chats/650e8400-e29b-41d4-a716-446655440004/pinned-messages \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messageId": "750e8400-e29b-41d4-a716-446655440001",
+    "displayOrder": 1
+  }'
+
+# Lấy danh sách tin nhắn đã ghim
+curl -X GET http://localhost:8080/api/v1/chats/650e8400-e29b-41d4-a716-446655440004/pinned-messages \
+  -H "Authorization: Bearer $TOKEN"
+
+# Bỏ ghim một tin nhắn
+curl -X DELETE http://localhost:8080/api/v1/chats/650e8400-e29b-41d4-a716-446655440004/pinned-messages/750e8400-e29b-41d4-a716-446655440001 \
+  -H "Authorization: Bearer $TOKEN"
+
+# Kiểm tra xem tin nhắn có được ghim không
+curl -X GET http://localhost:8080/api/v1/chats/650e8400-e29b-41d4-a716-446655440004/pinned-messages/750e8400-e29b-41d4-a716-446655440001/is-pinned \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ### Participant APIs
 ```bash
 # Lấy danh sách participants

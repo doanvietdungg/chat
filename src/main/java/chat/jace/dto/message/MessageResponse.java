@@ -1,6 +1,7 @@
 package chat.jace.dto.message;
 
 import chat.jace.domain.enums.MessageType;
+import chat.jace.dto.file.FileResponse;
 import lombok.Builder;
 import lombok.Data;
 
@@ -15,7 +16,8 @@ public class MessageResponse {
     private UUID authorId;
     private String text;
     private MessageType type;
-    private UUID fileId;
+    private UUID fileId;  // Keep for backward compatibility
+    private FileResponse file;  // Full file info with URL
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

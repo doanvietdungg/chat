@@ -1,5 +1,6 @@
 package chat.jace.domain;
 
+import chat.jace.domain.enums.FileOwnerType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
@@ -31,6 +32,15 @@ public class FileResource {
     private String url;
 
     private UUID uploadedBy;
+
+    // Polymorphic association fields
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    @Builder.Default
+    private FileOwnerType ownerType = FileOwnerType.NONE;
+
+    @Column(name = "owner_id")
+    private UUID ownerId;
 
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();

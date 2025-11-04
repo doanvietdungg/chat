@@ -1,6 +1,7 @@
 package chat.jace.controller;
 
 import chat.jace.domain.FileResource;
+import chat.jace.dto.common.ResponseFactory;
 import chat.jace.service.FileStorageService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/files")
+@RequestMapping("/api/v1/files")
 @RequiredArgsConstructor
 public class FileController {
 
@@ -29,16 +30,17 @@ public class FileController {
     private String localPath;
 
     @PostMapping("/upload")
-    public ResponseEntity<FileResource> upload(@RequestParam("file") MultipartFile file) throws IOException {
+    public ResponseEntity<?> upload(@RequestParam("file") MultipartFile file) throws IOException {
         // TODO: add type validation and size checks beyond Spring limits
-        return ResponseEntity.ok(storageService.save(file));
+        FileResource fileResource = storageService.save(file);
+        return ResponseFactory.created(fileResource, "Upload file thành công");
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<FileResource> get(@PathVariable UUID id) {
+    public ResponseEntity<?> get(@PathVariable UUID id) {
         return storageService.get(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .map(file -> ResponseFactory.success(file, "Lấy thông tin file thành công"))
+                .orElse(ResponseFactory.notFound("File không tồn tại"));
     }
 
     // Raw file serving; storedName is the filename part saved in url (after /files/)
@@ -59,8 +61,8 @@ public class FileController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> delete(@PathVariable UUID id) throws IOException {
+    public ResponseEntity<?> delete(@PathVariable UUID id) throws IOException {
         storageService.delete(id);
-        return ResponseEntity.ok(Map.of("status", "deleted"));
+        return ResponseFactory.noContent("Xóa file thành công");
     }
 }

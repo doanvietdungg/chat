@@ -12,9 +12,10 @@ public class MessageCreateRequest {
     @NotNull
     private UUID chatId;
 
-    @NotBlank
-    private String text;
+    private String text;  // Optional when fileId is provided
 
     @NotNull
     private MessageType type = MessageType.TEXT;
+
+    private UUID fileId;  // Optional: ID of uploaded file
 }

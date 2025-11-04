@@ -50,6 +50,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/actuator/health",
                                 "/api/v1/auth/**",
+                                "/api/v1/files/raw/**",  // Allow public access to file downloads
                                 "/ws/**",
                                 "/test/**"
                         ).permitAll()

@@ -9,6 +9,7 @@ import chat.jace.dto.message.MessageCreateRequest;
 import chat.jace.dto.message.MessageResponse;
 import chat.jace.repository.MessageRepository;
 import chat.jace.repository.ParticipantRepository;
+import chat.jace.repository.UserRepository;
 import chat.jace.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -27,11 +28,12 @@ public class MessageService {
     private final ParticipantRepository participantRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final FileStorageService fileStorageService;
+    private final UserRepository userRepository;
 
     public Page<MessageResponse> list(UUID chatId, Pageable pageable) {
         UUID me = SecurityUtils.currentUserIdOrThrow();
         requireMember(chatId, me);
-        return messageRepository.findByChatIdOrderByCreatedAtAsc(chatId, pageable)
+        return messageRepository.findByChatIdOrderByCreatedAtDesc(chatId, pageable)
                 .map(this::toResponse);
     }
 
@@ -40,17 +42,41 @@ public class MessageService {
         UUID me = SecurityUtils.currentUserIdOrThrow();
         requireMember(req.getChatId(), me);
         
-        // Validate: either text or fileId must be provided
-        if ((req.getText() == null || req.getText().isBlank()) && req.getFileId() == null) {
+        // Validate content: at least one of text or fileId must be provided
+        boolean hasText = req.getText() != null && !req.getText().isBlank();
+        boolean hasFile = req.getFileId() != null;
+        if (!hasText && !hasFile) {
             throw new IllegalArgumentException("Either text or fileId must be provided");
         }
-        
+
+        // Validate reply: if replying, target must exist in same chat
+        UUID replyToId = null;
+        if (req.getReplyToId() != null) {
+            Message replied = messageRepository.findById(req.getReplyToId())
+                    .orElseThrow(() -> new IllegalArgumentException("Replied message not found"));
+            if (!replied.getChatId().equals(req.getChatId())) {
+                throw new IllegalArgumentException("Cannot reply to a message from another chat");
+            }
+            replyToId = replied.getId();
+        }
+
+        // Validate forward: if provided, it must be an existing userId (original author)
+        UUID forwardedFromId = null;
+        if (req.getForwardedFromId() != null) {
+            UUID uid = req.getForwardedFromId();
+            userRepository.findById(uid)
+                    .orElseThrow(() -> new IllegalArgumentException("Forward source user not found"));
+            forwardedFromId = uid;
+        }
+
         Message msg = Message.builder()
                 .chatId(req.getChatId())
                 .authorId(me)
                 .text(req.getText())
                 .type(req.getType() == null ? MessageType.TEXT : req.getType())
                 .fileId(req.getFileId())
+                .replyToId(replyToId)
+                .forwardedFromId(forwardedFromId)
                 .build();
         msg = messageRepository.save(msg);
         
@@ -109,6 +135,8 @@ public class MessageService {
                 .text(m.getText())
                 .type(m.getType())
                 .fileId(m.getFileId())
+                .replyToId(m.getReplyToId())
+                .forwardedFromId(m.getForwardedFromId())
                 .createdAt(m.getCreatedAt())
                 .updatedAt(m.getUpdatedAt());
         

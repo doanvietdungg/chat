@@ -34,6 +34,12 @@ public class Message {
 
     private UUID fileId;
 
+    @Column(name = "reply_to_id")
+    private UUID replyToId;
+
+    @Column(name = "forwarded_from_id")
+    private UUID forwardedFromId;
+
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();
 

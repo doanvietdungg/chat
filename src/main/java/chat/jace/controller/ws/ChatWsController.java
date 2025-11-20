@@ -47,7 +47,7 @@ public class ChatWsController {
                     .text(payload.getText())
                     .type(payload.getType() == null ? MessageType.TEXT : payload.getType())
                     .build();
-            msg = messageRepository.save(msg);
+
             messagingTemplate.convertAndSend("/topic/chats/" + payload.getChatId() + "/messages", msg);
         }
 

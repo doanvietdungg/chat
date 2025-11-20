@@ -18,6 +18,8 @@ public class MessageResponse {
     private MessageType type;
     private UUID fileId;  // Keep for backward compatibility
     private FileResponse file;  // Full file info with URL
+    private UUID replyToId; // Message this one replies to
+    private UUID forwardedFromId; // Source message if forwarded
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

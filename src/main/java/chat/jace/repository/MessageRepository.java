@@ -8,5 +8,5 @@ import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 
 public interface MessageRepository extends JpaRepository<Message, UUID> {
-    Page<Message> findByChatIdOrderByCreatedAtAsc(UUID chatId, Pageable pageable);
+    Page<Message> findByChatIdOrderByCreatedAtDesc(UUID chatId, Pageable pageable);
 }

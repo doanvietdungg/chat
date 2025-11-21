@@ -20,6 +20,7 @@ public class MessageResponse {
     private FileResponse file;  // Full file info with URL
     private UUID replyToId; // Message this one replies to
     private UUID forwardedFromId; // Source message if forwarded
+    private String forwardedFromUsername; // Username of the original author when forwarded
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -40,6 +41,12 @@ public class MessageController {
     @DeleteMapping("/messages/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         messageService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/messages")
+    public ResponseEntity<Void> deleteMultiple(@RequestBody List<UUID> messageIds) {
+        messageService.deleteMultiple(messageIds);
         return ResponseEntity.noContent().build();
     }
 }

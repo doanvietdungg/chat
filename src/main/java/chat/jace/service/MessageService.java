@@ -18,6 +18,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -30,11 +31,30 @@ public class MessageService {
     private final FileStorageService fileStorageService;
     private final UserRepository userRepository;
 
+    @Transactional(readOnly = true)
     public Page<MessageResponse> list(UUID chatId, Pageable pageable) {
         UUID me = SecurityUtils.currentUserIdOrThrow();
         requireMember(chatId, me);
-        return messageRepository.findByChatIdOrderByCreatedAtDesc(chatId, pageable)
-                .map(this::toResponse);
+        
+        Page<Message> messages = messageRepository.findByChatIdOrderByCreatedAtDesc(chatId, pageable);
+        
+        // Collect all forwardedFromIds
+        var forwardedFromIds = messages.getContent().stream()
+                .map(Message::getForwardedFromId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        
+        // Fetch all users in one query
+        var usersMap = forwardedFromIds.isEmpty() 
+                ? java.util.Collections.<UUID, String>emptyMap()    
+                : userRepository.findAllById(forwardedFromIds).stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                        chat.jace.domain.User::getId,
+                        chat.jace.domain.User::getUsername
+                    ));
+        
+        return messages.map(m -> toResponse(m, usersMap));
     }
 
     @Transactional
@@ -121,6 +141,38 @@ public class MessageService {
         messagingTemplate.convertAndSend("/topic/chats/" + msg.getChatId() + "/events", event("message.deleted", messageId));
     }
 
+    @Transactional
+    public void deleteMultiple(java.util.List<UUID> messageIds) {
+        UUID me = SecurityUtils.currentUserIdOrThrow();
+        
+        // Fetch all messages
+        var messages = messageRepository.findAllById(messageIds);
+        
+        if (messages.isEmpty()) {
+            return;
+        }
+        
+        // Validate all messages belong to same chat and user is author
+        UUID chatId = messages.get(0).getChatId();
+        requireMember(chatId, me);
+        
+        for (Message msg : messages) {
+            if (!msg.getChatId().equals(chatId)) {
+                throw new IllegalArgumentException("All messages must belong to the same chat");
+            }
+            if (!me.equals(msg.getAuthorId())) {
+                throw new IllegalArgumentException("Only author can delete messages");
+            }
+        }
+        
+        // Delete all
+        messageRepository.deleteAllById(messageIds);
+        
+        // Send event
+        messagingTemplate.convertAndSend("/topic/chats/" + chatId + "/events", 
+            event("messages.deleted", messageIds));
+    }
+
     private void requireMember(UUID chatId, UUID userId) {
         if (!participantRepository.existsByChatIdAndUserId(chatId, userId)) {
             throw new IllegalArgumentException("Not a chat participant");
@@ -128,6 +180,10 @@ public class MessageService {
     }
 
     public MessageResponse toResponse(Message m) {
+        return toResponse(m, java.util.Collections.emptyMap());
+    }
+    
+    private MessageResponse toResponse(Message m, java.util.Map<UUID, String> forwardedUsersMap) {
         MessageResponse.MessageResponseBuilder builder = MessageResponse.builder()
                 .id(m.getId())
                 .chatId(m.getChatId())
@@ -146,7 +202,12 @@ public class MessageService {
                 builder.file(toFileResponse(file));
             });
         }
-        
+
+        // Use map for forwarded username
+        if (m.getForwardedFromId() != null && forwardedUsersMap.containsKey(m.getForwardedFromId())) {
+            builder.forwardedFromUsername(forwardedUsersMap.get(m.getForwardedFromId()));
+        }
+
         return builder.build();
     }
     

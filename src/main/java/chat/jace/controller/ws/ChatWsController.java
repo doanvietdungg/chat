@@ -5,8 +5,11 @@ import chat.jace.domain.enums.MessageType;
 import chat.jace.dto.ws.SendMessagePayload;
 import chat.jace.dto.ws.TypingPayload;
 import chat.jace.dto.ws.ReadReceiptPayload;
+import chat.jace.dto.ws.PresencePayload;
 import chat.jace.repository.MessageRepository;
 import chat.jace.service.ReadReceiptService;
+import chat.jace.service.UserPresenceService;
+import chat.jace.service.PresenceCacheService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +31,8 @@ public class ChatWsController {
     private final SimpMessagingTemplate messagingTemplate;
     private final MessageRepository messageRepository;
     private final ReadReceiptService readReceiptService;
+    private final UserPresenceService userPresenceService;
+    private final PresenceCacheService presenceCacheService;
 
     @MessageMapping("/messages.send")
     public void sendMessage(@Valid SendMessagePayload payload, Principal principal, SimpMessageHeaderAccessor headers) {
@@ -95,5 +100,14 @@ public class ChatWsController {
         if (userId == null) return;
         // Delegate to service (persists and broadcasts)
         readReceiptService.markRead(payload.getMessageId());
+    }
+
+    @MessageMapping("/presence")
+    public void updatePresence(@Valid PresencePayload payload, Principal principal) {
+        String userId = principal != null ? principal.getName() : null;
+        if (userId == null) return;
+        
+        log.info("User {} updating presence to {}", userId, payload.getStatus());
+        presenceCacheService.updatePresence(UUID.fromString(userId), payload.getStatus());
     }
 }

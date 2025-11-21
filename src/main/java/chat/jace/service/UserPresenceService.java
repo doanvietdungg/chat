@@ -65,6 +65,18 @@ public class UserPresenceService {
                         .build());
     }
 
+    @Transactional(readOnly = true)
+    public java.util.Map<UUID, PresenceStatus> getOnlineStatus(java.util.List<UUID> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        return userPresenceRepository.findByUserIdIn(userIds).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                    UserPresence::getUserId,
+                    UserPresence::getStatus
+                ));
+    }
+
     private void broadcastPresenceChange(UUID userId, PresenceStatus status, OffsetDateTime timestamp) {
         Map<String, Object> presenceEvent = new HashMap<>();
         presenceEvent.put("userId", userId);

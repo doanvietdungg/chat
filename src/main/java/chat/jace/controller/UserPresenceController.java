@@ -1,6 +1,7 @@
 package chat.jace.controller;
 
 import chat.jace.domain.enums.PresenceStatus;
+import chat.jace.dto.common.ResponseFactory;
 import chat.jace.service.UserPresenceService;
 import chat.jace.service.PresenceCacheService;
 import lombok.RequiredArgsConstructor;
@@ -19,26 +20,27 @@ public class UserPresenceController {
     private final UserPresenceService userPresenceService;
     private final PresenceCacheService presenceCacheService;
 
-    @PostMapping("/check")
-    public ResponseEntity<Map<UUID, PresenceStatus>> checkOnlineStatus(@RequestBody List<UUID> userIds) {
+    @PostMapping("/status")
+    public ResponseEntity<?> checkOnlineStatus(@RequestBody List<UUID> userIds) {
         Map<UUID, PresenceStatus> statusMap = presenceCacheService.getPresenceMap(userIds);
-        return ResponseEntity.ok(statusMap);
+        return ResponseFactory.success(statusMap, "Lấy trạng thái người dùng thành công");
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<Map<String, Object>> getUserPresence(@PathVariable UUID userId) {
+    public ResponseEntity<?> getUserPresence(@PathVariable UUID userId) {
         PresenceStatus status = presenceCacheService.getPresence(userId);
         var presence = userPresenceService.getUserPresence(userId);
-        return ResponseEntity.ok(Map.of(
+        Map<String, Object> data = Map.of(
             "userId", userId,
             "status", status,
             "lastSeenAt", presence.getLastSeenAt()
-        ));
+        );
+        return ResponseFactory.success(data, "Lấy thông tin trạng thái thành công");
     }
     
     @GetMapping("/online")
-    public ResponseEntity<Map<UUID, PresenceStatus>> getAllOnlineUsers() {
+    public ResponseEntity<?> getAllOnlineUsers() {
         Map<UUID, PresenceStatus> onlineUsers = presenceCacheService.getAllOnlineUsers();
-        return ResponseEntity.ok(onlineUsers);
+        return ResponseFactory.success(onlineUsers, "Lấy danh sách người dùng online thành công");
     }
 }

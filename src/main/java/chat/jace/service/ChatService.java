@@ -6,6 +6,7 @@ import chat.jace.domain.User;
 import chat.jace.domain.enums.ChatType;
 import chat.jace.domain.enums.ParticipantRole;
 import chat.jace.dto.chat.ChatCreateRequest;
+import chat.jace.dto.chat.ChatParticipantInfo;
 import chat.jace.dto.chat.ChatResponse;
 import chat.jace.dto.chat.ChatUpdateRequest;
 import chat.jace.repository.ChatRepository;
@@ -21,7 +22,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -178,19 +181,40 @@ public class ChatService {
     private ChatResponse toResponse(Chat chat, UUID currentUserId) {
         String displayTitle = chat.getTitle();
         
+        // Get all participants for this chat
+        var participants = participantRepository.findByChatId(chat.getId());
+        var participantUserIds = participants.stream()
+                .map(Participant::getUserId)
+                .toList();
+        
+        // Fetch all participant users in one query
+        Map<UUID, User> usersMap = userRepository.findAllById(participantUserIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+        
+        // Build participant info list
+        List<ChatParticipantInfo> participantInfoList = participants.stream()
+                .map(p -> {
+                    User user = usersMap.get(p.getUserId());
+                    return user != null ? ChatParticipantInfo.builder()
+                            .id(user.getId())
+                            .name(user.getUsername())
+                            .avatar(user.getAvatarUrl())
+                            .build() : null;
+                })
+                .filter(info -> info != null)
+                .toList();
+        
         // For PRIVATE chats, calculate title dynamically based on the other user
         if (chat.getType() == ChatType.PRIVATE) {
             // Find the other participant (not the current user)
-            var participants = participantRepository.findByChatId(chat.getId());
             var otherUser = participants.stream()
                     .filter(p -> !p.getUserId().equals(currentUserId))
                     .findFirst();
             
             if (otherUser.isPresent()) {
                 // Get the other user's name
-                displayTitle = userRepository.findById(otherUser.get().getUserId())
-                        .map(User::getUsername)
-                        .orElse("Unknown User");
+                User user = usersMap.get(otherUser.get().getUserId());
+                displayTitle = user != null ? user.getUsername() : "Unknown User";
             }
         }
         
@@ -202,6 +226,7 @@ public class ChatService {
                 .createdBy(chat.getCreatedBy())
                 .createdAt(chat.getCreatedAt())
                 .updatedAt(chat.getUpdatedAt())
+                .participants(participantInfoList)
                 .build();
     }
 

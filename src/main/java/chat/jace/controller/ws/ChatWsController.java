@@ -107,7 +107,7 @@ public class ChatWsController {
         String userId = principal != null ? principal.getName() : null;
         if (userId == null) return;
         
-        log.info("User {} updating presence to {}", userId, payload.getStatus());
+        log.info("User {} updating prese    nce to {}", userId, payload.getStatus());
         presenceCacheService.updatePresence(UUID.fromString(userId), payload.getStatus());
     }
 }

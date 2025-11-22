@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -17,4 +18,5 @@ public class ChatResponse {
     private UUID createdBy;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
+    private List<ChatParticipantInfo> participants;
 }

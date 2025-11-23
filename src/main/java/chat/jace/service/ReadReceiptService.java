@@ -24,14 +24,13 @@ public class ReadReceiptService {
     private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
-    public void markRead(UUID messageId) {
-        UUID me = SecurityUtils.currentUserIdOrThrow();
+    public void markRead(UUID messageId, UUID userId) {
         Message msg = messageRepository.findById(messageId).orElseThrow();
-        requireMember(msg.getChatId(), me);
-        if (!messageReadRepository.existsByMessageIdAndUserId(messageId, me)) {
-            messageReadRepository.save(MessageRead.builder().messageId(messageId).userId(me).build());
+        requireMember(msg.getChatId(), userId);
+        if (!messageReadRepository.existsByMessageIdAndUserId(messageId, userId)) {
+            messageReadRepository.save(MessageRead.builder().messageId(messageId).userId(userId).build());
             messagingTemplate.convertAndSend("/topic/chats/" + msg.getChatId() + "/events",
-                    Map.of("type", "message.read", "payload", Map.of("messageId", messageId.toString(), "userId", me.toString())));
+                    Map.of("type", "message.read", "payload", Map.of("messageId", messageId.toString(), "userId", userId.toString())));
         }
     }
 

@@ -94,12 +94,12 @@ public class ChatWsController {
         messagingTemplate.convertAndSend("/topic/chats/" + payload.getChatId() + "/typing", evt);
     }
 
-    @MessageMapping("/read")
+    @MessageMapping("/messages/read")
     public void read(@Valid ReadReceiptPayload payload, Principal principal) {
-        String userId = principal != null ? principal.getName() : null;
+        UUID userId = principal != null ? UUID.fromString(principal.getName()) : null;
         if (userId == null) return;
         // Delegate to service (persists and broadcasts)
-        readReceiptService.markRead(payload.getMessageId());
+        readReceiptService.markRead(payload.getMessageId(),userId);
     }
 
     @MessageMapping("/presence")

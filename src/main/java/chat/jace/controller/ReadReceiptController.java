@@ -14,9 +14,9 @@ public class ReadReceiptController {
 
     private final ReadReceiptService readReceiptService;
 
-    @PostMapping("/messages/{id}/read")
-    public ResponseEntity<Map<String, String>> markRead(@PathVariable UUID id) {
-        readReceiptService.markRead(id);
-        return ResponseEntity.ok(Map.of("status", "ok"));
-    }
+//    @PostMapping("/messages/{id}/read")
+//    public ResponseEntity<Map<String, String>> markRead(@PathVariable UUID id) {
+//        readReceiptService.markRead(id);
+//        return ResponseEntity.ok(Map.of("status", "ok"));
+//    }
 }

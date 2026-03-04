@@ -4,7 +4,8 @@ spring:
     base-url: ${APP_BASE_URL:http://localhost:8080}
     file-storage:
       local-path: ${FILE_STORAGE_PATH:./uploads}
-
+  profiles:
+    active: ${ACTIVE_PROFILE:stg}
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/chatdb}
     username: ${DB_USER:postgres}
@@ -42,6 +43,9 @@ server:
   port: ${PORT:8080}
 
 management:
+  tracing:
+    sampling:
+      probability: 1.0
   endpoints:
     web:
       exposure:
@@ -63,3 +67,13 @@ jwt:
   access-token-ttl: ${JWT_ACCESS_TTL:PT15M}
   refresh-token-ttl: ${JWT_REFRESH_TTL:P7D}
   secret: ${JWT_SECRET:YmFzZTY0LXNlY3JldC1rZXktZm9yLWRldi10ZXN0aW5nLXNob3VsZC1iZS1hdC1sZWFzdC0zMmJ5dGVzLWxvbmc=}
+
+
+sensitive-data:
+  log:
+    percentage: ${SENSITIVE_DATA_LOG_PERCENTAGE:10}
+
+logging:
+  level:
+    vn:
+      ghtk: ${LOG_LEVEL:DEBUG}

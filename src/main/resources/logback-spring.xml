@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}] [%t] %p %logger{36} %m%n</pattern>
+            <charset>utf8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <provider class="net.logstash.logback.composite.loggingevent.LoggingEventPatternJsonProvider">
+                <pattern>{"msg":"%.-20000msg"}</pattern>
+            </provider>
+            <fieldNames>
+                <timestamp>[ignore]</timestamp>
+                <thread>thread</thread>
+                <message>[ignore]</message>
+                <logger>logger</logger>
+                <version>[ignore]</version>
+                <levelValue>[ignore]</levelValue>
+                <stackTrace>exception</stackTrace>
+            </fieldNames>
+        </encoder>
+    </appender>
+
+<!--    <appender name="Sentry" class="io.sentry.logback.SentryAppender">-->
+<!--        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">-->
+<!--            <level>ERROR</level>-->
+<!--        </filter>-->
+<!--        &lt;!&ndash; Optionally add an encoder &ndash;&gt;-->
+<!--        <encoder>-->
+<!--            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>-->
+<!--        </encoder>-->
+<!--    </appender>-->
+
+    <springProfile name="dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <!--            <appender-ref ref="Sentry" />-->
+        </root>
+        <!--        <logger name="org.springframework.security.oauth2.jwt.NimbusJwtDecoder" level="TRACE"/>-->
+    </springProfile>
+
+    <springProfile name="stg,prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE_JSON"/>
+<!--            <appender-ref ref="Sentry" />-->
+        </root>
+    </springProfile>
+
+    <springProfile name="debug">
+        <root level="DEBUG">
+            <appender-ref ref="CONSOLE_JSON"/>
+<!--            <appender-ref ref="Sentry" />-->
+        </root>
+    </springProfile>
+
+</configuration>

@@ -52,7 +52,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/**",
                                 "/api/v1/files/raw/**",  // Allow public access to file downloads
                                 "/ws/**",
-                                "/test/**"
+                                "/test/**",
+                                "/test-trace"
                         ).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()

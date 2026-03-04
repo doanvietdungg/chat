@@ -21,10 +21,15 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import chat.jace.dto.participant.ParticipantAddRequest;
 
 @Service
 @RequiredArgsConstructor
@@ -53,89 +58,152 @@ public class ChatService {
         UUID me = SecurityUtils.currentUserIdOrThrow();
         ChatType type = req.getType() == null ? ChatType.PRIVATE : req.getType();
 
-        // Validate title for GROUP/CHANNEL if required
+        validateGroupTitle(type, req.getTitle());
+
+        if (type == ChatType.PRIVATE && req.getOtherUserId() != null) {
+            Optional<ChatResponse> existing = findExistingPrivateChat(me, req.getOtherUserId());
+            if (existing.isPresent()) return existing.get();
+        }
+
+        Chat chat = buildAndSaveChat(req, type, me);
+
+        Set<UUID> recipients = new HashSet<>();
+        recipients.add(me);
+        addOwnerParticipant(chat.getId(), me);
+        addPrivateParticipantIfNeeded(chat.getId(), type, req.getOtherUserId(), recipients);
+        addGroupParticipantsIfNeeded(chat.getId(), me, req.getParticipants(), recipients);
+
+        var resp = toResponse(chat, me);
+        notifyChatCreated(resp, recipients);
+        return resp;
+    }
+
+    /**
+     * Validates that GROUP and CHANNEL chats have a non-blank title.
+     *
+     * @param type  the chat type being created
+     * @param title the requested title
+     * @throws IllegalArgumentException if the title is missing for a GROUP or CHANNEL
+     */
+    private void validateGroupTitle(ChatType type, String title) {
         if ((type == ChatType.GROUP || type == ChatType.CHANNEL)
-                && (req.getTitle() == null || req.getTitle().isBlank())) {
+                && (title == null || title.isBlank())) {
             throw new IllegalArgumentException("Title is required for group or channel");
         }
+    }
 
-        // PRIVATE de-dup: if otherUserId provided, try to find existing 1-1 chat
-        if (type == ChatType.PRIVATE && req.getOtherUserId() != null) {
-            UUID other = req.getOtherUserId();
-            var myParts = participantRepository.findByUserId(me);
-            for (Participant part : myParts) {
-                var existingOpt = chatRepository.findById(part.getChatId());
-                if (existingOpt.isPresent() && existingOpt.get().getType() == ChatType.PRIVATE) {
-                    if (participantRepository.existsByChatIdAndUserId(existingOpt.get().getId(), other)) {
-                        return toResponse(existingOpt.get(), me);
-                    }
-                }
+    /**
+     * Searches for an existing PRIVATE chat between two users to avoid duplicates.
+     *
+     * @param me    the current user's ID
+     * @param other the other user's ID
+     * @return an {@link Optional} containing the existing {@link ChatResponse}, or empty if none found
+     */
+    private Optional<ChatResponse> findExistingPrivateChat(UUID me, UUID other) {
+        var myParts = participantRepository.findByUserId(me);
+        for (Participant part : myParts) {
+            var existingOpt = chatRepository.findById(part.getChatId());
+            if (existingOpt.isPresent() && existingOpt.get().getType() == ChatType.PRIVATE
+                    && participantRepository.existsByChatIdAndUserId(existingOpt.get().getId(), other)) {
+                return Optional.of(toResponse(existingOpt.get(), me));
             }
         }
+        return Optional.empty();
+    }
 
-        // Create chat
-        // For PRIVATE chats, don't save title (will be calculated dynamically)
+    /**
+     * Builds and persists a new {@link Chat} entity from the request.
+     * PRIVATE chats are saved without a title; it is computed dynamically at read time.
+     *
+     * @param req       the creation request
+     * @param type      the resolved chat type
+     * @param createdBy the UUID of the user creating the chat
+     * @return the saved {@link Chat} entity
+     */
+    private Chat buildAndSaveChat(ChatCreateRequest req, ChatType type, UUID createdBy) {
         String titleToSave = (type == ChatType.PRIVATE) ? null : req.getTitle();
-        
         Chat chat = Chat.builder()
                 .type(type)
                 .title(titleToSave)
                 .description(req.getDescription())
-                .createdBy(me)
+                .createdBy(createdBy)
                 .build();
-        chat = chatRepository.save(chat);
+        return chatRepository.save(chat);
+    }
 
-        // Add owner
+    /**
+     * Adds the chat creator as an {@link ParticipantRole#OWNER} participant.
+     *
+     * @param chatId the ID of the chat
+     * @param userId the ID of the owner
+     */
+    private void addOwnerParticipant(UUID chatId, UUID userId) {
         participantRepository.save(Participant.builder()
-                .chatId(chat.getId())
-                .userId(me)
+                .chatId(chatId)
+                .userId(userId)
                 .role(ParticipantRole.OWNER)
                 .build());
-        // recipients to notify about chat.created
-        java.util.Set<java.util.UUID> recipients = new java.util.HashSet<>();
-        recipients.add(me);
+    }
 
-        // If PRIVATE with otherUserId, add the other user as MEMBER
-        if (type == ChatType.PRIVATE && req.getOtherUserId() != null) {
-            UUID other = req.getOtherUserId();
-            if (!participantRepository.existsByChatIdAndUserId(chat.getId(), other)) {
-                participantRepository.save(Participant.builder()
-                        .chatId(chat.getId())
-                        .userId(other)
-                        .role(ParticipantRole.MEMBER)
-                        .build());
-                recipients.add(other);
-            }
+    /**
+     * Adds the peer user as a {@link ParticipantRole#MEMBER} in a PRIVATE chat, if not already present.
+     * Also registers the peer in the {@code recipients} set for event notification.
+     *
+     * @param chatId     the ID of the chat
+     * @param type       the chat type (only acts for {@link ChatType#PRIVATE})
+     * @param otherId    the peer user's ID; may be {@code null}
+     * @param recipients mutable set of user IDs to notify
+     */
+    private void addPrivateParticipantIfNeeded(UUID chatId, ChatType type, UUID otherId, Set<UUID> recipients) {
+        if (type != ChatType.PRIVATE || otherId == null) return;
+        if (!participantRepository.existsByChatIdAndUserId(chatId, otherId)) {
+            participantRepository.save(Participant.builder()
+                    .chatId(chatId)
+                    .userId(otherId)
+                    .role(ParticipantRole.MEMBER)
+                    .build());
+            recipients.add(otherId);
         }
+    }
 
-        // If initial participants provided (GROUP/CHANNEL), add them
-        if (req.getParticipants() != null && !req.getParticipants().isEmpty()) {
-            for (var pReq : req.getParticipants()) {
-                if (pReq == null || pReq.getUserId() == null) continue;
-                UUID uid = pReq.getUserId();
-                if (uid.equals(me)) continue; // already added as owner
-                if (participantRepository.existsByChatIdAndUserId(chat.getId(), uid)) continue;
-                ParticipantRole role = pReq.getRole() == null ? ParticipantRole.MEMBER : pReq.getRole();
-                if (role == ParticipantRole.OWNER) role = ParticipantRole.MEMBER; // disallow owner assignment
-                participantRepository.save(Participant.builder()
-                        .chatId(chat.getId())
-                        .userId(uid)
-                        .role(role)
-                        .build());
-                recipients.add(uid);
-            }
+    /**
+     * Adds the initial participant list (GROUP / CHANNEL creation) as {@link ParticipantRole#MEMBER}s.
+     * Skips the owner, duplicates, and silently downgrades any attempt to assign {@link ParticipantRole#OWNER}.
+     *
+     * @param chatId       the ID of the chat
+     * @param me           the owner's ID (already added; skipped here)
+     * @param participants the requested participant list; may be {@code null} or empty
+     * @param recipients   mutable set of user IDs to notify
+     */
+    private void addGroupParticipantsIfNeeded(UUID chatId, UUID me,
+            List<ParticipantAddRequest> participants, Set<UUID> recipients) {
+        if (participants == null || participants.isEmpty()) return;
+        for (var pReq : participants) {
+            if (pReq == null || pReq.getUserId() == null) continue;
+            UUID uid = pReq.getUserId();
+            if (uid.equals(me) || participantRepository.existsByChatIdAndUserId(chatId, uid)) continue;
+            ParticipantRole role = pReq.getRole() == null ? ParticipantRole.MEMBER : pReq.getRole();
+            if (role == ParticipantRole.OWNER) role = ParticipantRole.MEMBER; // disallow owner assignment via request
+            participantRepository.save(Participant.builder()
+                    .chatId(chatId)
+                    .userId(uid)
+                    .role(role)
+                    .build());
+            recipients.add(uid);
         }
+    }
 
-        var resp = toResponse(chat, me);
-        // Send chat.created to each participant's user-specific events channel
+    /**
+     * Broadcasts a {@code chat.created} WebSocket event to every participant.
+     *
+     * @param resp       the created chat response payload
+     * @param recipients the set of user IDs to notify
+     */
+    private void notifyChatCreated(ChatResponse resp, Set<UUID> recipients) {
+        var event = Map.of("type", "chat.created", "payload", resp);
         for (var uid : recipients) {
-            messagingTemplate.convertAndSend("/user/" + uid + "/events",
-                    java.util.Map.of(
-                            "type", "chat.created",
-                            "payload", resp
-                    ));
+            messagingTemplate.convertAndSend("/user/" + uid + "/events", event);
         }
-        return resp;
     }
 
     public ChatResponse get(UUID chatId) {

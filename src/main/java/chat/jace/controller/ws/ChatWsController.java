@@ -2,14 +2,12 @@ package chat.jace.controller.ws;
 
 import chat.jace.domain.Message;
 import chat.jace.domain.enums.MessageType;
+import chat.jace.dto.ws.PresencePayload;
+import chat.jace.dto.ws.ReadReceiptPayload;
 import chat.jace.dto.ws.SendMessagePayload;
 import chat.jace.dto.ws.TypingPayload;
-import chat.jace.dto.ws.ReadReceiptPayload;
-import chat.jace.dto.ws.PresencePayload;
-import chat.jace.repository.MessageRepository;
-import chat.jace.service.ReadReceiptService;
-import chat.jace.service.UserPresenceService;
 import chat.jace.service.PresenceCacheService;
+import chat.jace.service.ReadReceiptService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +20,7 @@ import java.security.Principal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 @Slf4j
 @Controller
@@ -29,9 +28,7 @@ import java.util.UUID;
 public class ChatWsController {
 
     private final SimpMessagingTemplate messagingTemplate;
-    private final MessageRepository messageRepository;
     private final ReadReceiptService readReceiptService;
-    private final UserPresenceService userPresenceService;
     private final PresenceCacheService presenceCacheService;
 
     @MessageMapping("/messages.send")
@@ -67,7 +64,9 @@ public class ChatWsController {
                     .build();
             
             String recipientIdStr = recipientId.toString();
-            
+            Predicate<String> isLonger = str -> str.length() > 8;
+            System.out.println(isLonger.negate()); // false
+
             // Try both methods: user-specific and topic broadcast
             log.info("Attempting to send message to user: {}", recipientIdStr);
             log.info("Message payload: type={}, text={}", msg != null ? "message.sent" : "message.first", eventMsg.getText());

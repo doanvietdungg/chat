@@ -1,0 +1,43 @@
+# ============================================================
+# Test profile — tắt các dependencies cần external services
+# Dùng cho @SpringBootTest (integration tests)
+# Unit tests (@WebMvcTest, @ExtendWith(MockitoExtension)) không cần file này
+# ============================================================
+spring:
+  # Tắt Flyway khi test để không chạy migration vào DB thật
+  flyway:
+    enabled: false
+
+  # Tắt Datasource auto-config — dùng H2 in-memory thay PostgreSQL
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+    show-sql: false
+
+  # Tắt Redis auto-config
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+  # Tắt RabbitMQ nếu dùng
+  rabbitmq:
+    host: localhost
+
+# Tắt tracing trong test
+management:
+  tracing:
+    enabled: false
+
+# JWT secret cho test
+app:
+  jwt:
+    secret: dGVzdC1zZWNyZXQta2V5LWZvci11bml0LXRlc3RpbmctcHVycG9zZXMtb25seQ==
+    expiration: 3600000
